@@ -1,0 +1,319 @@
+#include <ros/ros.h>
+#include <image_transport/image_transport.h>
+#include <cv_bridge/cv_bridge.h>
+#include <sensor_msgs/image_encodings.h>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/highgui/highgui.hpp>
+
+#include <opencv2/core/core.hpp>
+#include <boost/thread/mutex.hpp>
+
+#include <math.h>
+#include <eigen3/Eigen/Geometry>
+
+static const std::string OPENCV_WINDOW = "Image window";
+static const std::string SLOPE_WINDOW = "slope window";
+
+
+namespace enc = sensor_msgs::image_encodings;
+
+class PlaneDetect
+{
+	ros::NodeHandle nh_;
+	image_transport::ImageTransport it_;
+	image_transport::Subscriber image_sub_;
+	image_transport::Publisher image_pub_;
+
+	sensor_msgs::ImageConstPtr kinect_depthimg_msg, old_kinect_depthimg_msg;
+	boost::mutex m;
+
+	public:
+	PlaneDetect()
+		: it_(nh_)
+	{
+		// Subscrive to input video feed and publish output video feed
+		image_sub_ = it_.subscribe("/camera/depth/image_raw", 1,
+		  &PlaneDetect::planeDetect_callback, this);
+		image_pub_ = it_.advertise("/image_converter/output_video", 1);
+
+		cv::namedWindow(OPENCV_WINDOW);
+	}
+	~PlaneDetect()
+	{
+		cv::destroyWindow(OPENCV_WINDOW);
+	}
+	void planeDetect_callback(const sensor_msgs::ImageConstPtr& msg)
+	{
+
+		m.lock ();
+		kinect_depthimg_msg = msg;
+		m.unlock ();
+
+		if (!kinect_depthimg_msg || kinect_depthimg_msg == old_kinect_depthimg_msg)
+			return;
+		old_kinect_depthimg_msg = kinect_depthimg_msg;
+
+		//change ros image to cv image
+		cv_bridge::CvImagePtr cv_depthptr;
+		try
+		{
+			cv_depthptr = cv_bridge::toCvCopy(msg, sensor_msgs::image_encodings::TYPE_32FC1);
+		}
+		catch (cv_bridge::Exception& e)
+		{
+			ROS_ERROR("cv_bridge exception: %s", e.what());
+			return;
+		}
+
+
+
+
+		//process depth cv image
+/*
+		cv::Mat depth_clean(cv_depthptr->image.rows, cv_depthptr->image.cols, CV_32FC1);
+		cv::Mat img(cv_depthptr->image.rows, cv_depthptr->image.cols, CV_8UC1);
+		for(int i = t_margin; i < cv_depthptr->image.rows-t_margin; i++)
+		{
+			float* Di = cv_depthptr->image.ptr<float>(i);
+			float* Ii = depth_clean.ptr<float>(i);
+			char* Ivi = img.ptr<char>(i);
+			for(int j = t_margin; j < cv_depthptr->image.cols-t_margin; j++)
+			{
+				if(Di[j] > 0.0f)
+				{
+					Ii[j] = Di[j];
+					Ivi[j] = (char) (255*((Di[j])/(5.5))); // some suitable values..
+				}
+				else
+				{
+					Ii[j] = 0.0f;
+					Ivi[j] = 0;
+				}
+			}
+		}
+*/
+		//get slope of row direction
+
+/*
+		int t_color_r=0, t_color_g=0, t_color_b=0;
+
+		for (int i = t_margin; i < cv_depthptr->image.rows-t_margin-1; i++)
+		{
+			t_color_r=(t_color_r+30) % 255;
+			t_color_g=(t_color_g+100)% 255;
+			for(int j_index=0; j_index<t_num_row_partition; j_index++)
+			{
+				t_color_b=(t_color_b+40)%255;
+				cv::line(plane_slope_row,
+						cv::Point(t_margin+j_index*t_length_partition,i),cv::Point(t_margin+(j_index+1)*t_length_partition,i),
+						cv::Scalar(t_color_r,t_color_g,t_color_b),1,CV_AA);
+			}
+		}
+*/
+
+		cv::Mat a(480,640,CV_32FC1);
+		cv::Mat b(480,640,CV_32FC1);
+		cv::Mat c(480,640,CV_32FC1);
+		cv::Mat var(480,640,CV_32FC1);
+
+		float a_max=0;
+		float a_min=0;
+		float a_aver=0;
+		float b_max=0;
+		float b_min=0;
+		float b_aver=0;
+		float c_max=0;
+		float c_min=0;
+		float c_aver=0;
+		float var_max=0;
+		float var_min=9999;
+		float var_aver=0;
+
+		int t_margin=0;
+
+		cv::Mat plane_slope_row(cv_depthptr->image.rows, cv_depthptr->image.cols, CV_8UC3);
+		static int t_length_partition=5;
+		static int t_num_row_partition=(640-2*t_margin)/t_length_partition;
+		static int t_num_col_partition=(480-2*t_margin)/t_length_partition;
+
+		for (int i_index=0; i_index<t_num_col_partition;i_index++)
+		{
+			for(int j_index=0; j_index<t_num_row_partition; j_index++)
+			{
+				int n=0;
+				float sumx=0;
+				float sumy=0;
+				float sumz=0;
+				float sumxx=0;
+				float sumxy=0;
+				float sumyy=0;
+				float sumxz=0;
+				float sumyz=0;
+				float sumzz=0;
+				for (int k_i=0;k_i<t_length_partition;k_i++)
+				{
+					for (int k_j=0;k_j<t_length_partition;k_j++)
+					{
+						int pixel_index_x=t_margin+j_index*t_length_partition+k_j;
+						int pixel_index_y=t_margin+i_index*t_length_partition+k_i;
+						float x=pixel_index_x;
+						float y=pixel_index_y;
+						float z=cv_depthptr->image.ptr<float>(pixel_index_y)[pixel_index_x];
+						n+=1;
+						sumx+=x;
+						sumy+=y;
+						sumz+=z;
+						sumxx+=x*x;
+						sumyy+=y*y;
+						sumxy+=x*y;
+						sumxz+=x*z;
+						sumyz+=y*z;
+						sumzz+=z*z;
+					}
+				}
+
+				Eigen::Matrix<float,3,3> A;
+				Eigen::Matrix<float,3,1> B(sumxz,sumyz,sumz);
+				Eigen::Matrix<float,3,1> abc(0,0,0);
+				A <<sumxx,sumxy,sumx,sumxy,sumyy,sumy,sumx,sumy,n;
+//					ROS_INFO("%f",A.determinant());
+//				 std::cout << "Here is the matrix m:\n" << A << B << std::endl;
+
+//					ROS_INFO("n=%d,sumx=%f,sumy=%f,sumz=%f,sumxx=%f,sumyy=%f,sumxy=%f,sumxz=%f,sumyz=%f",
+//						n,sumx,sumy,sumz,sumxx,sumyy,sumxy,sumxz,sumyz);
+				abc=A.inverse()*B;
+
+				float det=A.determinant();
+				if (det==0)
+				{
+					ROS_INFO("ddddfeafdsfadsfdasfdasfdasfdas");
+					std::cout << "Here is the matrix m:\n" << A << B << std::endl;
+				}
+//				ROS_INFO("%f",var_aver);
+
+				a.ptr<float>(i_index)[j_index]=abc(0,0);
+				b.ptr<float>(i_index)[j_index]=abc(1,0);
+				c.ptr<float>(i_index)[j_index]=abc(2,0);
+				float aa=abc(0,0);
+				float bb=abc(1,0);
+				float cc=abc(2,0);
+				var.ptr<float>(i_index)[j_index]=sumzz+aa*aa*sumxx+bb*bb*sumyy+n*cc*cc-2*aa*sumxz-2*bb*sumyz-2*cc*sumz+2*aa*bb*sumxy+2*aa*cc*sumx+2*bb*cc*sumy;
+				if(a.ptr<float>(i_index)[j_index]>a_max) a_max=a.ptr<float>(i_index)[j_index];
+				if(a.ptr<float>(i_index)[j_index]<a_min) a_min=a.ptr<float>(i_index)[j_index];
+				a_aver+=a.ptr<float>(i_index)[j_index];
+				if(b.ptr<float>(i_index)[j_index]>b_max) b_max=b.ptr<float>(i_index)[j_index];
+				if(b.ptr<float>(i_index)[j_index]<b_min) b_min=b.ptr<float>(i_index)[j_index];
+				b_aver+=b.ptr<float>(i_index)[j_index];
+				if(c.ptr<float>(i_index)[j_index]>c_max) c_max=c.ptr<float>(i_index)[j_index];
+				if(c.ptr<float>(i_index)[j_index]<c_min) c_min=c.ptr<float>(i_index)[j_index];
+				c_aver+=c.ptr<float>(i_index)[j_index];
+				if(var.ptr<float>(i_index)[j_index]>var_max) var_max=var.ptr<float>(i_index)[j_index];
+				if(var.ptr<float>(i_index)[j_index]<var_min) var_min=var.ptr<float>(i_index)[j_index];
+				var_aver+=var.ptr<float>(i_index)[j_index];
+
+
+	//			ROS_INFO("a=%f,b=%f,c=%f,var=%f",a.ptr<float>(i_index)[j_index],b.ptr<float>(i_index)[j_index],c.ptr<float>(i_index)[j_index],var.ptr<float>(i_index)[j_index]);
+
+
+
+			}
+		}
+
+/*
+		for (int i = t_margin; i < cv_depthptr->image.rows-t_margin; i++)
+		{
+			for(int j_index=0; j_index<t_num_row_partition; j_index++)
+			{
+				int n=0;
+				float sumx=0;
+				float sumy=0;
+				float sumxx=0;
+				float sumxy=0;
+				float sumyy=0;
+				for(int k=0;k<t_length_partition;k++)
+				{
+					float x=k;
+					float y=cv_depthptr->image.ptr<float>(i)[t_margin+(j_index*t_length_partition+k)];
+					n++;
+					sumx+=x;
+					sumy+=y;
+					sumxx+=x*x;
+					sumyy+=y*y;
+					sumxy+=x*y;
+
+				}
+//				ROS_INFO("n=%d,sumx=%f,sumy=%f,sumxx=%f,sumyy=%f,sumxy=%f",n,sumx,sumy,sumxx,sumyy,sumxy);
+
+				float a=(n*sumxy-sumx*sumy)/(n*sumxx-sumx*sumx);
+				float b=(sumy-a*sumx)/n;
+				var.ptr<float>(i)[j_index]=sumyy+a*a*sumxx+b*b*n-2*a*sumxy-2*b*sumy+2*a*b*sumx;
+				if(var.ptr<float>(i)[j_index]>var_max) var_max=var.ptr<float>(i)[j_index];
+				if(var.ptr<float>(i)[j_index]<var_min) var_min=var.ptr<float>(i)[j_index];
+				var_aver+=var.ptr<float>(i)[j_index];
+//				ROS_INFO("a=%f,b=%f,var=%f",a,b,var.ptr<float>(i)[j_index]);
+			}
+		}
+*/
+		ROS_INFO("%f",var_aver);
+		var_aver=var_aver/(t_num_col_partition*t_num_row_partition);
+
+		ROS_INFO("%f",var_aver);
+		ROS_INFO("%d,%d,%d",t_num_col_partition,t_num_row_partition,t_length_partition);
+		ROS_INFO("%f, %f, %f",var_min, var_aver, var_max);
+
+		int t_color_r=0, t_color_g=0, t_color_b=0;
+
+		for (int i_index=0; i_index<t_num_col_partition;i_index++)
+		{
+
+			for(int j_index=0; j_index<t_num_row_partition; j_index++)
+			{
+				int pixel_index_x=t_margin+j_index*t_length_partition;
+				int pixel_index_y=t_margin+i_index*t_length_partition;
+				float x=pixel_index_x;
+				float y=pixel_index_y;
+
+				t_color_r=(t_color_r+50)%255;
+				t_color_g=(t_color_g+100)%255;
+				t_color_b=(t_color_b+30)%255;
+
+				t_color_r=255*(1-var.ptr<float>(i_index)[j_index]*(var_max-var_min));
+				if(var.ptr<float>(i_index)[j_index]>var_aver) t_color_g=100;
+				//t_color_b=(t_color_b+40)%255;
+				cv::rectangle(plane_slope_row,
+						cv::Point(pixel_index_x,pixel_index_y),cv::Point(pixel_index_x+t_length_partition,pixel_index_y+t_length_partition),
+						cv::Scalar(t_color_b,t_color_g,t_color_r),CV_FILLED,CV_AA);
+			}
+		}
+
+
+
+//		ROS_INFO("%d",t_num_row_partition);
+
+//			ROS_INFO("%d,%d",cv_depthptr->image.rows,cv_depthptr->image.cols);
+//			ROS_INFO("%f,      %f,      %f",depth_clean.ptr<float>(320)[240],img.ptr<float>(320)[240],cv_depthptr->image.ptr<float>(320)[240]);
+		cv_bridge::CvImage cvres_out;
+		cvres_out.header = cv_depthptr->header;
+		cvres_out.encoding = enc::TYPE_32FC1;
+		cvres_out.image = cv_depthptr->image;
+		image_pub_.publish(cvres_out.toImageMsg());
+
+
+		// display
+//		cv::imshow(OPENCV_WINDOW, img);
+		cv::imshow(SLOPE_WINDOW, plane_slope_row);
+
+		cv::imshow(OPENCV_WINDOW, cv_depthptr->image);
+		cv::waitKey(3);
+
+
+	}
+};
+
+int main(int argc, char** argv)
+{
+	ros::init(argc, argv, "image_converter");
+	PlaneDetect pd;
+	ros::spin();
+	return 0;
+}
