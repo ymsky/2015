@@ -1,0 +1,229 @@
+
+
+Function MakeHighLevelGem(x_gem,y_gem)
+
+For j =1 to 100
+MoveTo x_gem, y_gem
+Delay 10
+Keypress "D", 50
+Delay 10
+
+MoveTo 2100, 1100
+Delay 10
+KeyDown "Shift", 1
+Delay 10
+For i = 1 To 5
+	KeyPress "g", 1
+	Delay 10
+	RightClick 1
+	Delay 10
+Next
+KeyUp "Shift", 1
+Delay 10
+
+MoveTo 1000, 1000
+Delay 10
+RightClick 1
+Delay 10
+
+MoveTo 2100, 1100
+Delay 10
+KeyPress "g", 1
+Delay 10
+RightDown 1
+Delay 10
+MoveTo 1920,400
+Delay 10
+RightUp 1
+Delay 10
+
+MoveTo 2100, 1100
+Delay 10
+RightDown 1
+Delay 10
+MoveTo 1920,400
+Delay 10
+RightUp 1
+Delay 10
+Next
+
+End Function
+
+Function NormalToTheEnd
+
+	KeyPress "i", 1
+	Delay 10
+	KeyPress "i", 1
+	Delay 10
+	
+	GetCursorPos x, y
+	KeyPress "t", 1
+	Delay 10
+	RightClick 1
+	Delay 10
+	
+	KeyDown "Shift", 1
+	Delay 10
+	For i = 1 To 3
+		MoveTo 1800 + 100 * i, 1200
+		Delay 10
+		RightClick 1
+		Delay 10
+	Next
+	
+	MoveTo 2100, 320
+	Delay 10
+	RightClick 1
+	Delay 10
+	
+	KeyUp "Shift", 1
+	Delay 10
+	
+	
+	MoveTo 1950,400
+	Delay 10
+	KeyPress "x", 1
+	Delay 10
+	
+	
+	MoveTo 2100, 1100
+	Delay 10
+	KeyPress "8", 1
+	Delay 10
+	RightClick 1
+	Delay 10
+	KeyPress "7", 1
+	Delay 10
+	RightClick 1
+	Delay 10
+	KeyPress "9", 1
+	Delay 10
+	RightClick 1
+	Delay 10
+	KeyPress "D", 13
+	Delay 10
+	
+	
+	MoveTo 50, 300
+	Delay 10
+	
+	KeyDown "Ctrl", 1
+	Delay 10
+	RightClick 1
+	Delay 10
+	KeyUp "Ctrl", 1
+	Delay 10
+	
+	KeyDown "shift", 1
+	Delay 10
+//	KeyPress "B", 1
+	Delay 10
+	RightClick 12
+	Delay 10
+	
+	MoveTo 2100, 1100
+	Delay 10
+	
+	For i = 1 To 2
+		KeyPress "G", 1
+		Delay 10
+		RightClick 1
+		Delay 10
+	Next
+	KeyUp "shift", 1
+	Delay 10
+	KeyPress "U",4
+	Delay 10
+	RightDown 1
+	Delay 10
+	MoveTo x, y
+	Delay 10
+	RightUp 1
+	Delay 10
+	KeyPress "Q",2
+	Delay 10
+
+	KeyPress "M", 10
+	Delay 10
+	
+	
+	delay 4000*3	
+	MoveTo x, y
+	Delay 10
+	KeyPress "U", 5
+	
+	
+	
+	Delay 4000
+	For i = 5 To 15
+			MoveTo 145+60*i, 847
+			Delay 10
+			KeyPress "T", 1
+			Delay 10
+			RightClick 1
+			Delay 10
+			MoveTo 145+60*i, 847+50
+			Delay 10
+			KeyPress "T", 1
+			Delay 10
+			RightClick 1
+			Delay 10
+			MoveTo 145+60*i, 847+100
+			Delay 10
+			KeyPress "A", 1
+			Delay 10
+			RightClick 1
+			Delay 10
+	Next
+	
+	delay 4000	
+	MoveTo x, y
+	Delay 10
+	KeyPress "U", 5
+	
+	Delay 4000
+	For i = 0 To 3
+			MoveTo 145+60*i, 847
+			Delay 10
+			KeyPress "T", 1
+			Delay 10
+			RightClick 1
+			Delay 10
+			MoveTo 145+60*i, 847+50
+			Delay 10
+			KeyPress "T", 1
+			Delay 10
+			RightClick 1
+			Delay 10
+			MoveTo 145+60*i, 847+100
+			Delay 10
+			KeyPress "A", 1
+			Delay 10
+			RightClick 1
+			Delay 10
+			MoveTo 145+60*i, 847+200
+			Delay 10
+			KeyPress "L", 1
+			Delay 10
+			RightClick 1
+			Delay 10
+			MoveTo 145+60*i, 847+300
+			Delay 10
+			KeyPress "C", 1
+			Delay 10
+			RightClick 1
+			Delay 10
+	Next
+	
+	delay 4000	
+	MoveTo x, y
+	Delay 10
+	KeyPress "U", 5
+	
+	
+End Function
+
+
+Delay 300
+//NormalToTheEnd 
+call MakeHighLevelGem(1800,920)
